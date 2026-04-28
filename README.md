@@ -112,13 +112,54 @@ az role assignment create \
 
 ### 4. GitHub Secrets 등록
 
-레포지토리 → Settings → Secrets and variables → Actions → New repository secret
+레포지토리 → Settings → Secrets and variables → Actions → **Secrets 탭** → New repository secret
 
-| Secret 이름 | 값 |
-|-------------|-----|
-| `AZURE_CLIENT_ID` | UAMI의 **Client ID** (Object ID 아님 주의) |
-| `AZURE_TENANT_ID` | Azure AD Tenant ID |
-| `AZURE_SUBSCRIPTION_ID` | Azure Subscription ID |
+| Secret 이름 | 값 | 비고 |
+|-------------|-----|------|
+| `AZURE_CLIENT_ID` | UAMI의 **Client ID** | Object ID 아님 주의 |
+| `AZURE_TENANT_ID` | Azure AD Tenant ID | |
+| `AZURE_SUBSCRIPTION_ID` | Azure Subscription ID | |
+
+> **Secret 이름 변경 시**: 이름을 다르게 사용하는 경우(예: `CLIENT_ID`, `TENANT_ID`, `SUBSCRIPTION_ID`) 워크플로우 파일의 `secrets.*` 참조도 동일하게 변경해야 합니다.
+>
+> ```yaml
+> # deploy-terraform.yml 내 변경 위치 (총 4곳)
+> env:
+>   ARM_CLIENT_ID: ${{ secrets.CLIENT_ID }}           # AZURE_CLIENT_ID → CLIENT_ID
+>   ARM_TENANT_ID: ${{ secrets.TENANT_ID }}           # AZURE_TENANT_ID → TENANT_ID
+>   ARM_SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }} # AZURE_SUBSCRIPTION_ID → SUBSCRIPTION_ID
+> ```
+
+---
+
+### 5. GitHub Actions Variables 등록 (선택)
+
+레포지토리 → Settings → Secrets and variables → Actions → **Variables 탭** → New repository variable
+
+Secrets는 암호화되어 로그에 마스킹되지만, **Variables**는 비민감 설정값을 외부에서 관리할 때 사용합니다.
+
+| Variable 이름 | 값 예시 | 설명 |
+|---------------|---------|------|
+| `TF_RESOURCE_GROUP` | `AZ-GITACTION-RG` | 기본 리소스 그룹 (워크플로우 default 대체 가능) |
+| `TF_LOCATION` | `koreacentral` | 기본 Azure 리전 |
+| `TF_VNET_NAME` | `vnet-oidc-test` | 기본 VNet 이름 |
+
+Variables를 워크플로우 default 값으로 활용하려면 아래처럼 수정합니다:
+
+```yaml
+# deploy-terraform.yml
+inputs:
+  resource_group_name:
+    default: ${{ vars.TF_RESOURCE_GROUP }}
+  location:
+    default: ${{ vars.TF_LOCATION }}
+  vnet_name:
+    default: ${{ vars.TF_VNET_NAME }}
+```
+
+> **Secrets vs Variables 선택 기준**
+> - 🔒 **Secrets**: Client ID, Tenant ID, Subscription ID 등 외부 노출 시 보안 위험이 있는 값
+> - 📋 **Variables**: 리소스 그룹명, 리전, VNet 이름 등 환경마다 달라지는 비민감 설정값
 
 ---
 
