@@ -140,17 +140,25 @@ jobs:
           echo "  Action         : ${{ inputs.action }}"
           echo ""
 
-          PLAN_FLAGS="-var=resource_group_name=${{ inputs.resource_group_name }} \
-            -var=location=${{ inputs.location }} \
-            -var=vnet_name=${{ inputs.vnet_name }} \
-            -out=tfplan \
-            -input=false"
+          set +e  # exit-on-error 비활성화 (exit code 2 처리 위해)
 
           if [ "${{ inputs.action }}" == "destroy" ]; then
-            terraform plan $PLAN_FLAGS -destroy
+            terraform plan \
+              -var="resource_group_name=${{ inputs.resource_group_name }}" \
+              -var="location=${{ inputs.location }}" \
+              -var="vnet_name=${{ inputs.vnet_name }}" \
+              -out=tfplan \
+              -input=false \
+              -destroy
             EXIT_CODE=$?
           else
-            terraform plan $PLAN_FLAGS -detailed-exitcode
+            terraform plan \
+              -var="resource_group_name=${{ inputs.resource_group_name }}" \
+              -var="location=${{ inputs.location }}" \
+              -var="vnet_name=${{ inputs.vnet_name }}" \
+              -out=tfplan \
+              -input=false \
+              -detailed-exitcode
             EXIT_CODE=$?
           fi
 
