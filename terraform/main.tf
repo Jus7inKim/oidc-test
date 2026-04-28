@@ -21,6 +21,9 @@ provider "azurerm" {
   client_id       = var.client_id
   tenant_id       = var.tenant_id
   subscription_id = var.subscription_id
+
+  # UAMI는 구독 레벨 Resource Provider 등록 권한 없음 → 자동 등록 비활성화
+  resource_provider_registrations = "none"
 }
 
 # ============================================================
