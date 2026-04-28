@@ -299,3 +299,106 @@ GitHub → Actions → `02 - Terraform Plan & Apply` → Run workflow
 | `AuthorizationFailed` on resource group read | UAMI에 해당 RG 권한 없음 | `az role assignment create`로 RG에 Contributor 할당 |
 | `tfplan not found` | `terraform plan -detailed-exitcode`의 exit code 2를 실패로 처리 | `terraform_wrapper: false` + `\|\| EXIT_CODE=$?` 패턴 사용 (이미 적용됨) |
 | OIDC token issuer mismatch | Federated Credential의 Issuer가 실제 OIDC 발급자와 불일치 | GHES 사용 시 Issuer를 `https://<GHES_HOST>/_services/token`으로 변경 |
+
+---
+
+## GitHub Enterprise Server (GHES) 사용 시 고려 사항
+
+### 체크리스트
+
+| # | 항목 | GitHub.com | GHES | 조치 |
+|---|------|-----------|------|------|
+| 1 | **OIDC Issuer URL** | `https://token.actions.githubusercontent.com` | `https://<GHES_HOST>/_services/token` | Azure Federated Credential Issuer 변경 |
+| 2 | **OIDC 기능 활성화** | 기본 활성화 | Site Admin 설정 필요 | GHES 관리자에게 활성화 요청 |
+| 3 | **azure/login audience** | 자동 설정 | 명시 권장 | 워크플로우에 `audience:` 추가 |
+| 4 | **Secret 이름** | 팀마다 상이 | 팀마다 상이 | 워크플로우 env 블록 4곳 수정 |
+| 5 | **actions/checkout 등 외부 액션** | GitHub Marketplace 직접 참조 | 내부 미러 또는 인터넷 접근 필요 | GHES 정책에 따라 액션 미러 구성 |
+
+---
+
+### 1. Azure Federated Credential Issuer 변경 (필수)
+
+GHES에서 발급하는 OIDC 토큰의 Issuer는 GitHub.com과 다릅니다.  
+Azure Portal 또는 CLI에서 Federated Credential을 **새로 추가**합니다 (기존 GitHub.com용은 삭제하거나 그대로 유지 가능).
+
+```bash
+az identity federated-credential create \
+  --identity-name <UAMI_NAME> \
+  --resource-group <UAMI_RESOURCE_GROUP> \
+  --name "ghes-oidc-production" \
+  --issuer "https://<GHES_HOST>/_services/token" \
+  --subject "repo:<org>/<repo>:environment:production" \
+  --audiences "api://AzureADTokenExchange"
+```
+
+> **Subject 형식은 동일합니다.** `repo:<org>/<repo>:environment:<env_name>`  
+> GHES 호스트명 예시: `github.ecodesamsung.com`
+
+---
+
+### 2. GHES OIDC 기능 활성화 (관리자 작업)
+
+GHES Site Admin이 OIDC를 활성화해야 합니다.
+
+```
+GHES 관리 콘솔 → Site Admin → Settings
+→ GitHub Actions → Enable OpenID Connect (OIDC)
+```
+
+활성화 후 OIDC 발급자 URL을 확인:
+```
+https://<GHES_HOST>/_services/token
+```
+
+---
+
+### 3. 워크플로우 수정 사항
+
+#### 3-1. azure/login에 audience 명시
+
+```yaml
+- name: Azure OIDC Login
+  uses: azure/login@v2
+  with:
+    client-id: ${{ secrets.AZURE_CLIENT_ID }}
+    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    audience: api://AzureADTokenExchange   # GHES 환경 필수
+```
+
+#### 3-2. Secret 이름이 다를 경우
+
+GHES 팀에서 `AZURE_` 접두사 없이 Secret을 관리하는 경우, 워크플로우의 `env:` 블록을 수정합니다.
+
+```yaml
+# 변경 전 (GitHub.com 기본)
+env:
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+# 변경 후 (GHES 팀 Secret 이름 예시)
+env:
+  AZURE_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+```
+
+> `env:` 블록 외에도 `azure/login` step의 `with:` 항목도 동일하게 수정해야 합니다.
+
+---
+
+### 4. 외부 Actions 사용 가능 여부 확인
+
+GHES에서 GitHub Marketplace 액션을 사용하려면 인터넷 접근이 허용되어야 합니다.  
+인터넷이 차단된 환경이라면 다음 액션을 내부 미러로 대체해야 합니다.
+
+| 액션 | 용도 |
+|------|------|
+| `actions/checkout@v4` | 코드 체크아웃 |
+| `azure/login@v2` | Azure OIDC 인증 |
+| `hashicorp/setup-terraform@v3` | Terraform CLI 설치 |
+| `actions/upload-artifact@v4` | tfplan 아티팩트 업로드 |
+| `actions/download-artifact@v4` | tfplan 아티팩트 다운로드 |
+
+> GHES 버전 3.0+ 에서는 **Actions GitHub Connect** 또는 **actions-sync** 도구로 액션을 미러링할 수 있습니다.
