@@ -23,7 +23,7 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 
   # UAMI는 구독 레벨 Resource Provider 등록 권한 없음 → 자동 등록 비활성화
-  resource_provider_registrations = "none"
+  skip_provider_registration = true
 }
 
 # ============================================================
