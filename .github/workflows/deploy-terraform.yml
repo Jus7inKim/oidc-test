@@ -138,6 +138,9 @@ jobs:
 
           if [ "${{ inputs.action }}" == "destroy" ]; then
             terraform plan \
+              -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+              -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
               -var="resource_group_name=${{ inputs.resource_group_name }}" \
               -var="location=${{ inputs.location }}" \
               -var="vnet_name=${{ inputs.vnet_name }}" \
@@ -147,6 +150,9 @@ jobs:
             EXIT_CODE=$?
           else
             terraform plan \
+              -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+              -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
               -var="resource_group_name=${{ inputs.resource_group_name }}" \
               -var="location=${{ inputs.location }}" \
               -var="vnet_name=${{ inputs.vnet_name }}" \
