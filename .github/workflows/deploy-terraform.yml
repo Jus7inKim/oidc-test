@@ -6,7 +6,7 @@ on:
       resource_group_name:
         description: '리소스 그룹 이름'
         required: true
-        default: 'AZ-WORKING-RG'
+        default: 'AZ-GITACTION-RG'
         type: string
       location:
         description: 'Azure 리전'

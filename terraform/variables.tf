@@ -16,7 +16,7 @@ variable "client_id" {
 variable "resource_group_name" {
   description = "기존 리소스 그룹 이름"
   type        = string
-  default     = "AZ-WORKING-RG"
+  default     = "AZ-GITACTION-RG"
 }
 
 variable "location" {
