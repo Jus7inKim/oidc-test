@@ -140,24 +140,31 @@ jobs:
           echo "  Action         : ${{ inputs.action }}"
           echo ""
 
+          PLAN_FLAGS="-var=resource_group_name=${{ inputs.resource_group_name }} \
+            -var=location=${{ inputs.location }} \
+            -var=vnet_name=${{ inputs.vnet_name }} \
+            -out=tfplan \
+            -input=false"
+
           if [ "${{ inputs.action }}" == "destroy" ]; then
-            terraform plan \
-              -var="resource_group_name=${{ inputs.resource_group_name }}" \
-              -var="location=${{ inputs.location }}" \
-              -var="vnet_name=${{ inputs.vnet_name }}" \
-              -out=tfplan \
-              -input=false \
-              -destroy
+            terraform plan $PLAN_FLAGS -destroy
+            EXIT_CODE=$?
           else
-            terraform plan \
-              -var="resource_group_name=${{ inputs.resource_group_name }}" \
-              -var="location=${{ inputs.location }}" \
-              -var="vnet_name=${{ inputs.vnet_name }}" \
-              -out=tfplan \
-              -input=false \
-              -detailed-exitcode; echo "exit_code=$?" >> $GITHUB_OUTPUT
+            terraform plan $PLAN_FLAGS -detailed-exitcode
+            EXIT_CODE=$?
           fi
-        continue-on-error: true
+
+          # exit code 의미:
+          #   0 = 변경사항 없음 (성공)
+          #   1 = 오류 (실패)
+          #   2 = 변경사항 있음 (성공 - apply 대상)
+          echo "exit_code=${EXIT_CODE}" >> $GITHUB_OUTPUT
+
+          if [ $EXIT_CODE -eq 1 ]; then
+            echo "Terraform Plan 실패 (exit code 1)"
+            exit 1
+          fi
+          exit 0
 
       # ============================================================
       # 8. Plan 결과 요약 출력
@@ -167,8 +174,14 @@ jobs:
         run: |
           echo "============================================"
           echo "Plan 결과: ${{ steps.plan.outcome }}"
+          echo "Exit Code: ${{ steps.plan.outputs.exit_code }} (0=변경없음, 2=변경있음)"
           echo "============================================"
-          terraform show -no-color tfplan
+          if [ -f tfplan ]; then
+            terraform show -no-color tfplan
+          else
+            echo "tfplan 파일이 없습니다. Plan 단계가 실패했을 수 있습니다."
+            exit 1
+          fi
 
       # ============================================================
       # 9. Plan 결과 artifact 저장
